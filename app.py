@@ -1,149 +1,207 @@
 import streamlit as st
 import pandas as pd
 from supabase import create_client, Client
-import time
-from datetime import datetime, time as datetime_time
 
 # 1. Page Configuration
-st.set_page_config(page_title="Live Emergency Headcount", layout="wide")
+st.set_page_config(
+    page_title="Factory Live Headcount & Muster Dashboard", 
+    page_icon="🏭", 
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-# 2. Database Connection Configuration
-SUPABASE_URL = "https://aqnryhvsltbwhcbnwiyr.supabase.co" # Your verified URL
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFxbnJ5aHZzbHRid2hjYm53aXlyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQzODM0NDksImV4cCI6MjA5OTk1OTQ0OX0.yBtM42rPhi1NmzJib4IemeJ9pzZpUROI2zLKVpb4C8s"          # Replace with your actual Anon Key
+# Initialize Supabase
+SUPABASE_URL = "YOUR_SUPABASE_URL"
+SUPABASE_KEY = "YOUR_SUPABASE_ANON_KEY"
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-@st.cache_resource
-def init_supabase():
-    return create_client(SUPABASE_URL, SUPABASE_KEY)
+# 2. Modern UI Styling
+st.markdown("""
+<style>
+    .metric-card {
+        background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+        border: 1px solid #374151;
+        border-radius: 12px;
+        padding: 18px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        text-align: center;
+        margin-bottom: 15px;
+    }
+    .metric-label {
+        font-size: 0.85rem;
+        color: #9ca3af;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-weight: 600;
+    }
+    .metric-value {
+        font-size: 2.2rem;
+        font-weight: 700;
+        color: #f9fafb;
+        margin-top: 5px;
+    }
+    .emergency-banner {
+        background: #dc2626;
+        color: white;
+        padding: 20px;
+        border-radius: 12px;
+        text-align: center;
+        font-weight: bold;
+        box-shadow: 0 0 15px rgba(220, 38, 38, 0.5);
+        margin-bottom: 20px;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-supabase: Client = init_supabase()
+# 3. Session State & Login Setup
+if "dash_user" not in st.session_state:
+    st.session_state.dash_user = None
+if "user_role" not in st.session_state:
+    st.session_state.user_role = None
 
-# 3. Handle Emergency State & Snapshot Cache across UI refreshes
-if 'emergency_mode' not in st.session_state:
-    st.session_state.emergency_mode = False
-if 'snapshot_counts' not in st.session_state:
-    st.session_state.snapshot_counts = {}
-if 'snapshot_total' not in st.session_state:
-    st.session_state.snapshot_total = 0
-if 'cleared_categories' not in st.session_state:
-    st.session_state.cleared_categories = set()
-
-# 4. Data Extraction Function (Filters data from the current calendar day)
-@st.cache_data(ttl=2) # Clears cache every 2 seconds for real-time streaming
-def fetch_live_logs():
-    today_start = datetime.now().combine(datetime.today(), datetime_time.min).isoformat()
-    
-    # Queries rows generated since 00:00 today to implement the daily automatic baseline reset
-    response = supabase.table("gate_logs").select("category, movement_type, count_value").gte("created_at", today_start).execute()
-    
-    # Process inputs into active headcounts
-    categories = [
-        "Staff", "Workers", "Contract Labours", "Housekeeping", 
-        "Loadmen", "Drivers+Helpers", "Visitors", "Interview candidates"
-    ]
-    
-    counts = {cat: 0 for cat in categories}
-    total = 0
-    
-    if response.data:
-        df = pd.DataFrame(response.data)
-        for cat in categories:
-            cat_df = df[df['category'] == cat]
-            ins = cat_df[cat_df['movement_type'] == 'IN']['count_value'].sum()
-            outs = cat_df[cat_df['movement_type'] == 'OUT']['count_value'].sum()
+# --- AUTHENTICATION GATEWAY ---
+if not st.session_state.dash_user:
+    st.markdown("<h2 style='text-align: center;'>🔐 Factory Headcount Dashboard Access</h2>", unsafe_allow_html=True)
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        with st.form("dash_login"):
+            u_input = st.text_input("Username").lower().strip()
+            p_input = st.text_input("Password", type="password")
+            submit = st.form_submit_button("Authenticate & Open Dashboard", use_container_width=True, type="primary")
             
-            current = max(0, ins - outs) # Prevents negative integer values from field log typos
-            counts[cat] = int(current)
-            total += int(current)
-            
-    return counts, total
+            if submit:
+                res = supabase.table("app_users").select("*").eq("username", u_input).eq("password", p_input).execute()
+                if res.data:
+                    u_data = res.data[0]
+                    if u_data.get("app_type") in ["dashboard", "both"]:
+                        st.session_state.dash_user = u_data["username"]
+                        st.session_state.user_role = u_data["role"]
+                        st.rerun()
+                    else:
+                        st.error("Unauthorized: User does not have access to Dashboard.")
+                else:
+                    st.error("Invalid Credentials.")
+    st.stop()
 
-# 5. Core Dashboard UI Logic
-if not st.session_state.emergency_mode:
-    # --- NORMAL OPERATIONS VIEW ---
-    st.markdown("<h1 style='text-align: center; color: #1e3d59;'>🏢 FACTORY LIVE HEADCOUNT PANEL</h1>", unsafe_allow_html=True)
-    st.write(f"<p style='text-align: center; color: #666;'>Last Updated: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}</p>", unsafe_allow_html=True)
-    st.write("---")
-    
-    live_counts, total_occupancy = fetch_live_logs()
-    
-    # Big Live Occupancy Counter Banner
-    st.markdown(f"""
-        <div style='background-color: #e8f1f5; padding: 20px; border-radius: 12px; text-align: center; border: 2px solid #1e3d59; margin-bottom: 25px;'>
-            <h2 style='margin: 0; color: #1e3d59; font-weight: 500;'>TOTAL PERSONS CURRENTLY INSIDE</h2>
-            <h1 style='margin: 10px 0 0 0; font-size: 65px; color: #1e3d59;'>{total_occupancy}</h1>
-        </div>
-    """, unsafe_allow_html=True)
-    
-    # Display Breakdown Grid
-    st.markdown("### 📊 Headcount by Category")
-    col1, col2, col3, col4 = st.columns(4)
-    col5, col6, col7, col8 = st.columns(4)
-    ui_cols = [col1, col2, col3, col4, col5, col6, col7, col8]
-    
-    for idx, (category, val) in enumerate(live_counts.items()):
-        with ui_cols[idx]:
-            st.metric(label=category, value=val)
-            
-    st.write("---")
-    
-    # Emergency Action Section
-    st.markdown("### ⚠️ Emergency Control Protocol")
-    if st.button("🚨 ACTIVATE EMERGENCY MUSTER MODE", use_container_width=True, type="primary"):
-        st.session_state.emergency_mode = True
-        st.session_state.snapshot_counts = live_counts.copy()
-        st.session_state.snapshot_total = total_occupancy
-        st.session_state.cleared_categories = set()
-       
+# Role permissions mapping
+ROLE_PERMISSIONS = {
+    "Super Admin": {"emergency": True, "admin_tools": True},
+    "Safety Officer": {"emergency": True, "admin_tools": False},
+    "Factory Head": {"emergency": True, "admin_tools": False},
+    "HR Rep": {"emergency": False, "admin_tools": False},
+    "Security Officer": {"emergency": False, "admin_tools": False}
+}
+
+user_perms = ROLE_PERMISSIONS.get(st.session_state.user_role, {"emergency": False, "admin_tools": False})
+
+# --- SIDEBAR ---
+with st.sidebar:
+    st.title("🏭 Control Panel")
+    st.markdown(f"👤 **User:** `{st.session_state.dash_user.upper()}`")
+    st.markdown(f"🛡️ **Role:** `{st.session_state.user_role}`")
+    st.divider()
+    if st.button("🔒 Logout", use_container_width=True):
+        st.session_state.dash_user = None
+        st.session_state.user_role = None
         st.rerun()
 
-else:
-    # --- EMERGENCY MUSTER MODE VIEW ---
-    st.markdown("<h1 style='text-align: center; color: #d32f2f; font-size: 45px;'>🚨 EMERGENCY EVACUATION MODE ACTIVE</h1>", unsafe_allow_html=True)
-    st.markdown("<h3 style='text-align: center; color: #b71c1c;'>Live Gate Logging Suspended • Baseline Count Locked</h3>", unsafe_allow_html=True)
-    st.write("---")
+# --- FETCH LIVE DATA FROM SUPABASE ---
+def fetch_live_headcount():
+    categories = [
+        "Permanent Staff", "Contract Workers", "Civil Workers", "Visitors", 
+        "Drivers/Cleaners", "Transporters", "Subcontractors", "Apprentices"
+    ]
+    counts = {cat: 0 for cat in categories}
     
-    # Show frozen target number
+    # Fetch logs selecting exact database columns
+    response = supabase.table("gate_logs").select("category, movement_type, count_value").execute()
+    if response.data:
+        for row in response.data:
+            cat = row.get("category")
+            if cat in counts:
+                cnt = row.get("count_value", 0) or 0
+                m_type = row.get("movement_type")
+                if m_type == "IN":
+                    counts[cat] += cnt
+                elif m_type == "OUT":
+                    counts[cat] = max(0, counts[cat] - cnt) # Prevent negative numbers
+    return counts
+
+live_counts = fetch_live_headcount()
+total_occupancy = sum(live_counts.values())
+
+# --- MAIN DASHBOARD INTERFACE ---
+st.title("📊 Factory Live Headcount & Evacuation Dashboard")
+
+# --- EMERGENCY MUSTER MODE ---
+if "emergency_mode" not in st.session_state:
+    st.session_state.emergency_mode = False
+
+if st.session_state.emergency_mode:
     st.markdown(f"""
-        <div style='background-color: #ffebee; padding: 20px; border-radius: 12px; text-align: center; border: 3px solid #d32f2f; margin-bottom: 25px;'>
-            <h2 style='margin: 0; color: #b71c1c;'>TARGET HEADCOUNT TO ACCOUNT FOR</h2>
-            <h1 style='margin: 10px 0 0 0; font-size: 70px; color: #b71c1c;'>{st.session_state.snapshot_total}</h1>
+        <div class='emergency-banner'>
+            <h1>🚨 EMERGENCY MUSTER MODE ACTIVE</h1>
+            <h3>EVACUATION TARGET HEADCOUNT BASELINE: {st.session_state.snapshot_total}</h3>
         </div>
     """, unsafe_allow_html=True)
     
-    st.markdown("### 📋 Muster Point Assembly Checklist")
-    st.write("Mark categories as cleared as groups report safely to assembly zones:")
-    
-    # Render checklist items dynamically
-    for category, target_count in st.session_state.snapshot_counts.items():
-        is_cleared = category in st.session_state.cleared_categories
-        
-        c_left, c_right = st.columns([3, 1])
-        with c_left:
-            if is_cleared:
-                st.markdown(f"✅ ~~**{category}**: {target_count} persons accounted for~~")
-            else:
-                st.markdown(f"❌ **{category}**: Need to account for **{target_count}** persons")
-        with c_right:
-            if not is_cleared:
-                if st.button(f"Clear {category}", key=f"clr_{category}"):
-                    st.session_state.cleared_categories.add(category)
-                    st.rerun()
-            else:
-                if st.button(f"Undo Clear", key=f"undo_{category}"):
-                    st.session_state.cleared_categories.remove(category)
-                    st.rerun()
-                    
-    st.write("---")
-    
-    # All groups accounted for condition
-    if len(st.session_state.cleared_categories) == len(st.session_state.snapshot_counts):
-        st.success("🎉 All categories checked and accounted for at muster points!")
-        
-    # Deactivate Emergency Mode
-    if st.button("🟢 Deactivate Emergency Mode & Resume Logging", use_container_width=True):
+    if st.button("🟢 DEACTIVATE EMERGENCY / RETURN TO NORMAL MONITORING", type="primary", use_container_width=True):
         st.session_state.emergency_mode = False
         st.rerun()
 
-# 6. Automatic UI loop execution (Refreshes the script interface every 3 seconds)
-time.sleep(3)
-st.rerun()
+# --- OCCUPANCY METRICS DISPLAY ---
+st.metric("TOTAL FACTORY OCCUPANCY", f"{total_occupancy} Persons")
+
+st.markdown("### 👥 Occupancy Breakdown by Category")
+cols = st.columns(4)
+for idx, (cat, val) in enumerate(live_counts.items()):
+    with cols[idx % 4]:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-label">{cat}</div>
+            <div class="metric-value">{val}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+st.divider()
+
+# --- ACTION CONTROLS (ROLE-BASED) ---
+
+# 1. Emergency Protocol Controls (Super Admin, Safety, Factory Head)
+if user_perms["emergency"]:
+    st.markdown("### 🚨 Emergency Control Protocol")
+    if not st.session_state.emergency_mode:
+        if st.button("🚨 ACTIVATE EMERGENCY MUSTER MODE", use_container_width=True, type="primary"):
+            st.session_state.emergency_mode = True
+            st.session_state.snapshot_total = total_occupancy
+            st.rerun()
+else:
+    st.info("ℹ️ Emergency Control Protocol access is restricted to Safety Officers, Factory Heads, and Super Admins.")
+
+# 2. Super Admin Control Tools
+if user_perms["admin_tools"]:
+    st.divider()
+    with st.expander("🛠️ Super Admin Tools (User Management & Reset)"):
+        st.warning("Admin Actions")
+        
+        tab1, tab2 = st.tabs(["Add User", "Reset Headcount Data"])
+        
+        with tab1:
+            with st.form("add_user_form"):
+                new_u = st.text_input("Username").lower().strip()
+                new_p = st.text_input("Password")
+                new_r = st.selectbox("Role", ["Super Admin", "Safety Officer", "Factory Head", "HR Rep", "Security Officer", "Inspector"])
+                new_app = st.selectbox("App Permission", ["dashboard", "gate", "both"])
+                submit_u = st.form_submit_button("Create User")
+                
+                if submit_u and new_u and new_p:
+                    supabase.table("app_users").insert({
+                        "username": new_u, "password": new_p, "role": new_r, "app_type": new_app
+                    }).execute()
+                    st.success(f"User {new_u} created successfully!")
+        
+        with tab2:
+            if st.button("⚠️ Clear All Gate Logs / Reset Data", type="secondary"):
+                supabase.table("gate_logs").delete().neq("id", 0).execute()
+                st.success("All daily gate logs cleared. Occupancy reset to 0.")
+                st.rerun()
