@@ -11,8 +11,10 @@ st.set_page_config(
 )
 
 # Initialize Supabase
-SUPABASE_URL = "YOUR_SUPABASE_URL"
-SUPABASE_KEY = "YOUR_SUPABASE_ANON_KEY"
+SUPABASE_URL = "https://aqnryhvsltbwhcbnwiyr.supabase.co" # Your verified URL
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFxbnJ5aHZzbHRid2hjYm53aXlyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQzODM0NDksImV4cCI6MjA5OTk1OTQ0OX0.yBtM42rPhi1NmzJib4IemeJ9pzZpUROI2zLKVpb4C8s"          # Replace with your actual Anon Key
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # 2. Modern UI Styling
