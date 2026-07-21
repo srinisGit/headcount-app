@@ -1,50 +1,70 @@
 import streamlit as st
 from supabase import create_client, Client
 
-# 1. Page Configuration for Mobile Terminals
+# 1. Page Configuration
 st.set_page_config(
     page_title="Factory Gate Terminal", 
     page_icon="🪪", 
     layout="wide",
     initial_sidebar_state="collapsed"
 )
-
 # Initialize Supabase
 
 SUPABASE_URL = st.secrets.get("SUPABASE_URL", "https://aqnryhvsltbwhcbnwiyr.supabase.co")
 SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFxbnJ5aHZzbHRid2hjYm53aXlyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQzODM0NDksImV4cCI6MjA5OTk1OTQ0OX0.yBtM42rPhi1NmzJib4IemeJ9pzZpUROI2zLKVpb4C8s" )
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# 2. Touch-Optimized CSS for Peak-Hour Speed
+# 2. Touch-Optimized CSS
 st.markdown("""
 <style>
-    /* Card Container */
     .gate-card {
-        background-color: #1f2937;
+        background: #1f2937;
         border: 2px solid #374151;
         border-radius: 12px;
-        padding: 12px;
+        padding: 14px;
+        margin-bottom: 15px;
+    }
+    .card-header {
+        color: #f9fafb;
+        font-size: 1.1rem;
+        font-weight: 700;
         text-align: center;
+        text-transform: uppercase;
+        border-bottom: 1px solid #374151;
+        padding-bottom: 6px;
         margin-bottom: 10px;
     }
-    .card-title {
+    .badge-grid {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 12px;
+        gap: 5px;
+    }
+    .stat-badge {
+        flex: 1;
+        background: #111827;
+        padding: 6px 4px;
+        border-radius: 6px;
+        text-align: center;
+    }
+    .badge-label {
+        font-size: 0.68rem;
         color: #9ca3af;
-        font-size: 0.95rem;
-        font-weight: 700;
+        font-weight: 600;
         text-transform: uppercase;
-        letter-spacing: 0.05em;
     }
-    .card-count {
-        color: #ffffff;
-        font-size: 2rem;
-        font-weight: 800;
-        margin: 4px 0;
-    }
-    /* Touch target padding for mobile screens */
-    .stButton>button {
-        height: 50px;
-        font-weight: bold;
+    .badge-value {
         font-size: 1.1rem;
+        font-weight: 800;
+    }
+    .val-in { color: #10b981; }
+    .val-out { color: #f43f5e; }
+    .val-net { color: #38bdf8; }
+    
+    .stButton>button {
+        height: 48px;
+        font-weight: bold;
+        font-size: 1.05rem;
         border-radius: 8px;
     }
 </style>
@@ -56,7 +76,7 @@ if "logged_user" not in st.session_state:
 if "user_role" not in st.session_state:
     st.session_state.user_role = None
 
-# --- AUTHENTICATION SCREEN ---
+# --- LOGIN GATEWAY ---
 if not st.session_state.logged_user:
     st.markdown("<h2 style='text-align: center;'>🪪 Gate Terminal Login</h2>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 2, 1])
@@ -80,7 +100,7 @@ if not st.session_state.logged_user:
                     st.error("Invalid Username or Password.")
     st.stop()
 
-# --- TOP HEADER ---
+# --- TOP BAR ---
 c_head1, c_head2 = st.columns([3, 1])
 with c_head1:
     st.markdown(f"👤 **Officer:** `{st.session_state.logged_user.upper()}` ({st.session_state.user_role})")
@@ -92,7 +112,7 @@ with c_head2:
 
 st.divider()
 
-# --- EXACT 9 CATEGORIES ORDER ---
+# --- EXACT 9 CATEGORIES ---
 CATEGORIES = [
     "Staff",
     "Workers",
@@ -105,64 +125,89 @@ CATEGORIES = [
     "Interview Candidates"
 ]
 
-# --- FETCH CURRENT LIVE COUNTS ---
-def fetch_current_counts():
-    counts = {cat: 0 for cat in CATEGORIES}
+# --- FETCH DETAILED CATEGORY METRICS FROM SUPABASE ---
+def fetch_detailed_metrics():
+    metrics = {cat: {"in": 0, "out": 0, "net": 0} for cat in CATEGORIES}
     res = supabase.table("gate_logs").select("category, movement_type, count_value").execute()
     if res.data:
         for row in res.data:
             cat = row.get("category")
-            if cat in counts:
+            if cat in metrics:
                 cnt = row.get("count_value", 0) or 0
                 if row.get("movement_type") == "IN":
-                    counts[cat] += cnt
+                    metrics[cat]["in"] += cnt
                 elif row.get("movement_type") == "OUT":
-                    counts[cat] = max(0, counts[cat] - cnt)
-    return counts
+                    metrics[cat]["out"] += cnt
+                
+                # Calculate net occupancy on site
+                metrics[cat]["net"] = max(0, metrics[cat]["in"] - metrics[cat]["out"])
+    return metrics
 
-live_counts = fetch_current_counts()
+metrics_data = fetch_detailed_metrics()
 
-# --- BATCH STEP QUANTITY SELECTOR ---
-st.markdown("### 🚪 Quick Gate Entry Terminal")
-step_qty = st.radio("Entry Step Size (for group entries):", [1, 5, 10], horizontal=True)
-
-# Helper function to record database entry instantly
-def record_entry(category, movement, qty):
+# Function to record movement
+def record_movement(category, movement_type, qty):
     payload = {
         "category": category,
-        "movement_type": movement,
+        "movement_type": movement_type,
         "count_value": qty,
         "username": st.session_state.logged_user
     }
     supabase.table("gate_logs").insert(payload).execute()
-    st.toast(f"{'➕ Recorded IN' if movement == 'IN' else '➖ Recorded OUT'}: {qty} x {category}", icon="✅")
+    st.toast(f"{'➕ IN' if movement_type == 'IN' else '➖ OUT'}: {qty} x {category}", icon="✅")
 
-# --- 3-COLUMN RESPONSIVE CARD GRID ---
+# --- 3-COLUMN CARD GRID UI ---
+st.markdown("### 🚪 Factory Gate Terminal")
+
 cols = st.columns(3)
 
 for idx, cat in enumerate(CATEGORIES):
     col = cols[idx % 3]
+    cat_stats = metrics_data.get(cat, {"in": 0, "out": 0, "net": 0})
+    
     with col:
-        # Display Card UI with Title & Visible Live Count
-        current_cnt = live_counts.get(cat, 0)
+        # Card Container with Title + IN / OUT / ON-SITE Breakdown
         st.markdown(f"""
         <div class="gate-card">
-            <div class="card-title">{cat}</div>
-            <div class="card-count">{current_cnt}</div>
+            <div class="card-header">{cat}</div>
+            <div class="badge-grid">
+                <div class="stat-badge">
+                    <div class="badge-label">Total IN</div>
+                    <div class="badge-value val-in">+{cat_stats['in']}</div>
+                </div>
+                <div class="stat-badge">
+                    <div class="badge-label">Total OUT</div>
+                    <div class="badge-value val-out">-{cat_stats['out']}</div>
+                </div>
+                <div class="stat-badge">
+                    <div class="badge-label">On Site</div>
+                    <div class="badge-value val-net">{cat_stats['net']}</div>
+                </div>
+            </div>
         </div>
         """, unsafe_allow_html=True)
         
-        # Dedicated IN / OUT Touch Buttons underneath each card
+        # Dedicated Input Field per Card (Defaulting to 1)
+        qty_input = st.number_input(
+            f"Qty ({cat})", 
+            min_value=1, 
+            value=1, 
+            step=1, 
+            key=f"qty_{idx}",
+            label_visibility="collapsed"
+        )
+        
+        # Action Buttons (IN & OUT) reading from this card's input field
         btn_in, btn_out = st.columns(2)
         with btn_in:
-            if st.button(f"➕ IN", key=f"in_{idx}", type="primary", use_container_width=True):
-                record_entry(cat, "IN", step_qty)
+            if st.button(f"➕ IN", key=f"in_btn_{idx}", type="primary", use_container_width=True):
+                record_movement(cat, "IN", qty_input)
                 st.rerun()
                 
         with btn_out:
-            if st.button(f"➖ OUT", key=f"out_{idx}", use_container_width=True):
-                if current_cnt > 0:
-                    record_entry(cat, "OUT", step_qty)
+            if st.button(f"➖ OUT", key=f"out_btn_{idx}", use_container_width=True):
+                if cat_stats['net'] >= qty_input:
+                    record_movement(cat, "OUT", qty_input)
                     st.rerun()
                 else:
-                    st.toast(f"Cannot exit: {cat} count is already 0", icon="⚠️")
+                    st.toast(f"Cannot exit {qty_input} {cat}: Only {cat_stats['net']} on site!", icon="⚠️")
