@@ -131,13 +131,23 @@ def fetch_detailed_metrics():
     from datetime import datetime, time
 
 # Fetch logs starting from 00:00:00 today
-today_start = datetime.combine(datetime.now().date(), time.min).isoformat()
+from datetime import datetime, time
+
+# --- FETCH DETAILED CATEGORY METRICS FROM SUPABASE ---
+def fetch_detailed_metrics():
+    metrics = {cat: {"in": 0, "out": 0, "net": 0} for cat in CATEGORIES}
+    
+    # Midnight timestamp for today (00:00:00)
+    today_start = datetime.combine(datetime.now().date(), time.min).isoformat()
+    
+    # Line 135: Make sure this has exactly 4 leading spaces (no extra spaces/tabs)
     res = (
         supabase.table("gate_logs")
         .select("category, movement_type, count_value")
         .gte("created_at", today_start)
         .execute()
     )
+    
     if res.data:
         for row in res.data:
             cat = row.get("category")
@@ -148,10 +158,9 @@ today_start = datetime.combine(datetime.now().date(), time.min).isoformat()
                 elif row.get("movement_type") == "OUT":
                     metrics[cat]["out"] += cnt
                 
-                # Calculate net occupancy on site
+                # Calculate net on site
                 metrics[cat]["net"] = max(0, metrics[cat]["in"] - metrics[cat]["out"])
     return metrics
-
 metrics_data = fetch_detailed_metrics()
 
 # Function to record movement
