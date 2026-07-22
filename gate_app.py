@@ -132,7 +132,7 @@ def fetch_detailed_metrics():
 
 # Fetch logs starting from 00:00:00 today
 today_start = datetime.combine(datetime.now().date(), time.min).isoformat()
-    res = supabase.table("gate_logs") \
+    res = supabase.table("gate_logs")
     .select("category, movement_type, count_value") \
     .gte("created_at", today_start) \
     .execute()
