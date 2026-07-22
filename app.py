@@ -100,23 +100,36 @@ user_perms = ROLE_PERMISSIONS.get(st.session_state.user_role, {"emergency": Fals
 with st.sidebar:
     st.title("🏭 Control Panel")
     st.markdown(f"👤 **User:** `{st.session_state.dash_user.upper()}`")
-    st.markdown(f"🛡️ **Role:** `{st.session_state.user_role}`")
+   # --- st.markdown(f"🛡️ **Role:** `{st.session_state.user_role}`") ---
     st.divider()
     if st.button("🔒 Logout", use_container_width=True):
         st.session_state.dash_user = None
         st.session_state.user_role = None
         st.rerun()
 
-# --- FETCH LIVE DATA FROM SUPABASE ---
+from datetime import datetime, time
+
+# --- FETCH LIVE DATA FROM SUPABASE (CURRENT DAY ONLY) ---
 def fetch_live_headcount():
+    # Exact categories list matching gate entries
     categories = [
-        "Staff", "Workers", "Contract Labours","Housekeeping","Loadmen", "Drivers+Helpers", "civil_workers", "Visitors", 
-        "interview candidates"
+        "Staff", "Workers", "Contract Labours", "Housekeeping", 
+        "Loadmen", "Drivers+Helpers", "Civil Workers", "Visitors", 
+        "Interview Candidates"
     ]
     counts = {cat: 0 for cat in categories}
     
-    # Fetch logs selecting exact database columns
-    response = supabase.table("gate_logs").select("category, movement_type, count_value").execute()
+    # Calculate midnight timestamp (00:00:00) for the current day
+    today_start = datetime.combine(datetime.now().date(), time.min).isoformat()
+    
+    # Fetch ONLY today's logs from Supabase
+    response = (
+        supabase.table("gate_logs")
+        .select("category, movement_type, count_value")
+        .gte("created_at", today_start)  # <--- Filters entries from 00:00:00 today onwards
+        .execute()
+    )
+    
     if response.data:
         for row in response.data:
             cat = row.get("category")
@@ -127,11 +140,11 @@ def fetch_live_headcount():
                     counts[cat] += cnt
                 elif m_type == "OUT":
                     counts[cat] = max(0, counts[cat] - cnt) # Prevent negative numbers
+                    
     return counts
 
 live_counts = fetch_live_headcount()
 total_occupancy = sum(live_counts.values())
-
 # --- MAIN DASHBOARD INTERFACE ---
 st.title("📊 Factory Live Headcount & Evacuation Dashboard")
 
