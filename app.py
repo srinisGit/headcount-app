@@ -110,8 +110,8 @@ with st.sidebar:
 # --- FETCH LIVE DATA FROM SUPABASE ---
 def fetch_live_headcount():
     categories = [
-        "Permanent Staff", "Contract Workers", "Civil Workers", "Visitors", 
-        "Drivers/Cleaners", "Transporters", "Subcontractors", "Apprentices"
+        "Staff", "Workers", "Contract Labours","Housekeeping","Loadmen", "Drivers+Helpers", "civil Workers", "Visitors", 
+        "interview candidates"
     ]
     counts = {cat: 0 for cat in categories}
     
