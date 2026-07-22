@@ -110,7 +110,7 @@ with st.sidebar:
 # --- FETCH LIVE DATA FROM SUPABASE ---
 def fetch_live_headcount():
     categories = [
-        "Staff", "Workers", "Contract Labours","Housekeeping","Loadmen", "Drivers+Helpers", "civil Workers", "Visitors", 
+        "Staff", "Workers", "Contract Labours","Housekeeping","Loadmen", "Drivers+Helpers", "civil_workers", "Visitors", 
         "interview candidates"
     ]
     counts = {cat: 0 for cat in categories}
@@ -178,7 +178,7 @@ if user_perms["emergency"]:
             st.session_state.snapshot_total = total_occupancy
             st.rerun()
 else:
-    st.info("ℹ️ Emergency Control Protocol access is restricted to Safety Officers, Factory Heads, and Super Admins.")
+    st.info("ℹ️ Emergency Control Protocol access will soon be available !")
 
 # 2. Super Admin Control Tools
 if user_perms["admin_tools"]:
