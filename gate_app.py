@@ -128,7 +128,14 @@ CATEGORIES = [
 # --- FETCH DETAILED CATEGORY METRICS FROM SUPABASE ---
 def fetch_detailed_metrics():
     metrics = {cat: {"in": 0, "out": 0, "net": 0} for cat in CATEGORIES}
-    res = supabase.table("gate_logs").select("category, movement_type, count_value").execute()
+    from datetime import datetime, time
+
+# Fetch logs starting from 00:00:00 today
+today_start = datetime.combine(datetime.now().date(), time.min).isoformat()
+    res = supabase.table("gate_logs") \
+    .select("category, movement_type, count_value") \
+    .gte("created_at", today_start) \
+    .execute()
     if res.data:
         for row in res.data:
             cat = row.get("category")
