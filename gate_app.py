@@ -42,7 +42,7 @@ st.markdown("""
     }
     .stat-badge {
         flex: 1;
-        background: #111827;
+        background: #FFDAB9;
         padding: 6px 4px;
         border-radius: 6px;
         text-align: center;
