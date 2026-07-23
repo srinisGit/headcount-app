@@ -18,7 +18,7 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 st.markdown("""
 <style>
     .gate-card {
-        background: #1f6937;
+        background: #5f2937;
         border: 2px solid #374151;
         border-radius: 12px;
         padding: 14px;
