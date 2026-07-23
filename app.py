@@ -4,7 +4,7 @@ from supabase import create_client, Client
 
 # 1. Page Configuration
 st.set_page_config(
-    page_title="Factory Live Headcount & Muster Dashboard", 
+    page_title="Live Headcount Dashboard", 
     page_icon="🏭", 
     layout="wide",
     initial_sidebar_state="expanded"
@@ -21,7 +21,7 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 st.markdown("""
 <style>
     .metric-card {
-        background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+        background: linear-gradient(135deg, #5f2937 0%, #511827 100%);
         border: 1px solid #374151;
         border-radius: 12px;
         padding: 18px;
@@ -146,7 +146,7 @@ def fetch_live_headcount():
 live_counts = fetch_live_headcount()
 total_occupancy = sum(live_counts.values())
 # --- MAIN DASHBOARD INTERFACE ---
-st.title("📊 Factory Live Headcount & Evacuation Dashboard")
+st.title("📊 Live Headcount & Evacuation Dashboard")
 
 # --- EMERGENCY MUSTER MODE ---
 if "emergency_mode" not in st.session_state:
@@ -165,7 +165,7 @@ if st.session_state.emergency_mode:
         st.rerun()
 
 # --- OCCUPANCY METRICS DISPLAY ---
-st.metric("TOTAL FACTORY OCCUPANCY", f"{total_occupancy} Persons")
+st.metric("TOTAL OCCUPANCY", f"{total_occupancy} Persons")
 
 st.markdown("### 👥 Occupancy Breakdown by Category")
 cols = st.columns(4)
