@@ -59,7 +59,7 @@ st.markdown("""
     }
     .val-in { color: #10b981; }
     .val-out { color: #f43f5e; }
-    .val-net { color: #38bdf8; }
+    .val-net { color: #58bdf8; }
     
     .stButton>button {
         height: 48px;
@@ -223,7 +223,7 @@ for idx, cat in enumerate(CATEGORIES):
                 st.rerun()
                 
         with btn_out:
-            if st.button(f"➖ OUT", key=f"out_btn_{idx}", use_container_width=True):
+            if st.button(f"➖ OUT", key=f"out_btn_{idx}", type="primary", use_container_width=True):
                 if cat_stats['net'] >= qty_input:
                     record_movement(cat, "OUT", qty_input)
                     st.rerun()
