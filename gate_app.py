@@ -67,6 +67,27 @@ st.markdown("""
         font-size: 1.05rem;
         border-radius: 8px;
     }
+    /* Green IN Button */
+    div[data-testid="stHorizontalBlock"] > div:nth-child(1) button[kind="primary"] {
+        background-color: #10b981 !important;
+        color: white !important;
+        border: none !important;
+    }
+    div[data-testid="stHorizontalBlock"] > div:nth-child(1) button[kind="primary"]:hover {
+        background-color: #059669 !important;
+        border: none !important;
+    }
+
+    /* Red OUT Button */
+    div[data-testid="stHorizontalBlock"] > div:nth-child(2) button {
+        background-color: #ef4444 !important;
+        color: white !important;
+        border: none !important;
+    }
+    div[data-testid="stHorizontalBlock"] > div:nth-child(2) button:hover {
+        background-color: #dc2626 !important;
+        border: none !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
