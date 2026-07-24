@@ -218,12 +218,12 @@ for idx, cat in enumerate(CATEGORIES):
         # Action Buttons (IN & OUT) reading from this card's input field
         btn_in, btn_out = st.columns(2)
         with btn_in:
-            if st.button(f"➕ IN", key=f"in_btn_{idx}", use_container_width=True):
+            if st.button(f"➕ IN", key=f"in_btn_{idx}", type="primary", use_container_width=True):
                 record_movement(cat, "IN", qty_input)
                 st.rerun()
                 
         with btn_out:
-            if st.button(f"➖ OUT", key=f"out_btn_{idx}", type="primary", use_container_width=True):
+            if st.button(f"➖ OUT", key=f"out_btn_{idx}", type="secondary", use_container_width=True):
                 if cat_stats['net'] >= qty_input:
                     record_movement(cat, "OUT", qty_input)
                     st.rerun()
